@@ -26,6 +26,8 @@ public sealed class SessionRow
     public TimeSpan Editor => Session.Editor;
     public TimeSpan Ide => Session.Ide;
     public string Date => Fmt.Day(Clock.DayOf(Session.Start));
+    public TimeSpan StartOfDay => Session.Start.TimeOfDay;
+    public TimeSpan EndOfDay => Session.End.TimeOfDay;
     public string StartText => Fmt.Time(Session.Start);
     public string EndText => Fmt.Time(Session.End);
     public string Range => $"{StartText} - {EndText}";

@@ -12,6 +12,8 @@ public partial class MainWindow : Window
     readonly OverviewView overview = new();
     readonly CalendarView calendar = new();
     readonly ProjectsView projects = new();
+    readonly LogView log = new();
+    readonly SettingsView settings = new();
     readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(10) };
     IView? current;
 
@@ -23,6 +25,7 @@ public partial class MainWindow : Window
 
         overview.OpenProject += ShowProject;
         projects.DataChanged += RefreshCurrent;
+        settings.DataChanged += RefreshCurrent;
 
         timer.Tick += (_, _) => RefreshCurrent();
         IsVisibleChanged += (_, _) =>
@@ -51,6 +54,8 @@ public partial class MainWindow : Window
     {
         current = sender == TabCalendar ? calendar
             : sender == TabProjects ? projects
+            : sender == TabLog ? log
+            : sender == TabSettings ? settings
             : overview;
         Host.Content = current;
         RefreshCurrent();
@@ -65,11 +70,15 @@ public partial class MainWindow : Window
     public void RefreshCurrent()
     {
         if (!IsVisible) return;
-        App.Tracker.Flush();
-        var snap = DataSnapshot.Load(App.Db);
-        current?.Refresh(snap);
-        var today = Stats.Sum(snap.Of(null), Clock.Range(Clock.Today, Clock.Today.AddDays(1)));
-        TodayText.Text = $"Today {Fmt.Dur(today.Work)}";
+        try
+        {
+            App.Tracker.Flush();
+            var snap = DataSnapshot.Load(App.Db);
+            current?.Refresh(snap);
+            var today = Stats.Sum(snap.Of(null), Clock.Range(Clock.Today, Clock.Today.AddDays(1)));
+            TodayText.Text = $"Today {Fmt.Dur(today.Work)}";
+        }
+        catch (Exception ex) { Log.Error(ex); }
     }
 
     void ShowStatus(TrackerStatus s)
@@ -84,13 +93,20 @@ public partial class MainWindow : Window
         });
     }
 
+    public void SaveSize()
+    {
+        if (WindowState != WindowState.Normal) return;
+        App.Settings.WindowWidth = Width;
+        App.Settings.WindowHeight = Height;
+    }
+
+    // The close button hides to the tray; exiting is done from the tray menu.
     protected override void OnClosing(CancelEventArgs e)
     {
-        if (WindowState == WindowState.Normal)
-        {
-            App.Settings.WindowWidth = Width;
-            App.Settings.WindowHeight = Height;
-        }
+        SaveSize();
+        e.Cancel = true;
+        Hide();
+        ((App)Application.Current).OnWindowHidden();
         base.OnClosing(e);
     }
 }

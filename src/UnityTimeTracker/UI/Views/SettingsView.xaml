@@ -1,0 +1,53 @@
+<UserControl x:Class="UnityTimeTracker.UI.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="8" MaxWidth="860" HorizontalAlignment="Left">
+      <HeaderedContentControl Style="{StaticResource Section}" Header="Startup">
+        <StackPanel>
+          <CheckBox x:Name="AutostartBox" Content="Start with Windows, minimized to the tray" Click="OnAutostart"/>
+          <TextBlock x:Name="AutostartInfo" Foreground="#8F8F8F" Margin="21,6,0,0" TextWrapping="Wrap" LineHeight="17"/>
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="Tracking">
+        <StackPanel>
+          <CheckBox x:Name="PauseBox" Content="Pause tracking" Click="OnPause"/>
+          <CheckBox x:Name="IdeBox" Content="Count time in code editors: Rider, Visual Studio, VS Code, Cursor" Margin="0,12,0,0" Click="OnIde"/>
+          <TextBlock Foreground="#8F8F8F" Margin="21,5,0,0" TextWrapping="Wrap"
+                     Text="Counted while the editor window is focused and its title contains the project name."/>
+
+          <TextBlock Text="Idle after" Margin="0,16,0,6"/>
+          <StackPanel x:Name="IdleOptions" Orientation="Horizontal"/>
+          <TextBlock Foreground="#8F8F8F" Margin="0,5,0,0" TextWrapping="Wrap"
+                     Text="Time stops counting after this long without keyboard or mouse input. The idle stretch itself is not counted."/>
+
+          <TextBlock Text="Day starts at" Margin="0,16,0,6"/>
+          <StackPanel x:Name="DayStartOptions" Orientation="Horizontal"/>
+          <TextBlock Foreground="#8F8F8F" Margin="0,5,0,0" TextWrapping="Wrap"
+                     Text="Work after midnight and before this hour counts toward the previous day."/>
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="Data">
+        <StackPanel>
+          <TextBlock x:Name="DataPath" Foreground="#8F8F8F" TextWrapping="Wrap"/>
+          <WrapPanel Margin="0,10,0,0">
+            <Button Content="Open data folder" Margin="0,0,6,0" Click="OnOpenData"/>
+            <Button Content="Export raw time (CSV)..." Margin="0,0,6,0" Click="OnExportRaw"/>
+            <Button Content="Import from Unity Hub" Click="OnImportHub"/>
+          </WrapPanel>
+          <TextBlock x:Name="DataStatus" Foreground="#8F8F8F" Margin="0,8,0,0"/>
+        </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="How it works">
+        <TextBlock TextWrapping="Wrap" Foreground="#9A9A9A" LineHeight="18">
+          Every second the tracker looks for running Unity editors. The project comes from the editor's -projectPath argument,
+          the scene from its window title. Unity open is how long an editor was running. In Unity counts only while a Unity window
+          is in front and you are not idle. Sessions are stretches of work split by breaks longer than 10 minutes.
+        </TextBlock>
+      </HeaderedContentControl>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
