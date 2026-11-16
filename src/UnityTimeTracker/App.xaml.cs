@@ -7,6 +7,10 @@ namespace UnityTimeTracker;
 
 public partial class App : Application
 {
+    public static Database Db { get; private set; } = null!;
+    public static AppSettings Settings { get; private set; } = null!;
+    public static Tracker Tracker { get; private set; } = null!;
+
     MainWindow? window;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -19,8 +23,30 @@ public partial class App : Application
         Thread.CurrentThread.CurrentUICulture = culture;
         DispatcherUnhandledException += (_, a) => { Log.Error(a.Exception); a.Handled = true; };
 
+        Settings = AppSettings.Load();
+        Db = new Database(AppPaths.Database);
+        try { UnityHub.Import(Db); }
+        catch (Exception ex) { Log.Error(ex); }
+
+        Tracker = new Tracker(Db, Settings);
+        Tracker.Start();
+
         window = new MainWindow();
-        window.Closed += (_, _) => Shutdown();
+        window.Closed += (_, _) => ExitApp();
         window.Show();
+    }
+
+    void ExitApp()
+    {
+        Tracker.Dispose();
+        Settings.Save();
+        Shutdown();
+    }
+
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        Tracker?.Dispose();
+        Settings?.Save();
+        base.OnSessionEnding(e);
     }
 }
