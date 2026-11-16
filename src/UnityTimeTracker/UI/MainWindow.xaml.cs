@@ -11,6 +11,7 @@ public partial class MainWindow : Window
 {
     readonly OverviewView overview = new();
     readonly CalendarView calendar = new();
+    readonly ProjectsView projects = new();
     readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(10) };
     IView? current;
 
@@ -19,6 +20,9 @@ public partial class MainWindow : Window
         InitializeComponent();
         Width = App.Settings.WindowWidth;
         Height = App.Settings.WindowHeight;
+
+        overview.OpenProject += ShowProject;
+        projects.DataChanged += RefreshCurrent;
 
         timer.Tick += (_, _) => RefreshCurrent();
         IsVisibleChanged += (_, _) =>
@@ -45,9 +49,17 @@ public partial class MainWindow : Window
 
     void OnTab(object sender, RoutedEventArgs e)
     {
-        current = sender == TabCalendar ? calendar : overview;
+        current = sender == TabCalendar ? calendar
+            : sender == TabProjects ? projects
+            : overview;
         Host.Content = current;
         RefreshCurrent();
+    }
+
+    void ShowProject(long id)
+    {
+        projects.Select(id);
+        TabProjects.IsChecked = true;
     }
 
     public void RefreshCurrent()
