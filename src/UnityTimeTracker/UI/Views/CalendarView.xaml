@@ -1,0 +1,87 @@
+<UserControl x:Class="UnityTimeTracker.UI.Views.CalendarView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:UnityTimeTracker.UI.Controls">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="8">
+      <HeaderedContentControl Style="{StaticResource Section}">
+        <HeaderedContentControl.Header>
+          <DockPanel>
+            <TextBlock x:Name="YearSummary" DockPanel.Dock="Right" FontWeight="Normal" Foreground="#8F8F8F" VerticalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal">
+              <Button Style="{StaticResource NavButton}" Click="OnPrevYear" ToolTip="Previous year">
+                <Path Data="{StaticResource ArrowLeft}" Fill="#D0D0D0"/>
+              </Button>
+              <TextBlock x:Name="YearLabel" Width="54" TextAlignment="Center" VerticalAlignment="Center"/>
+              <Button Style="{StaticResource NavButton}" Click="OnNextYear" ToolTip="Next year">
+                <Path Data="{StaticResource ArrowRight}" Fill="#D0D0D0"/>
+              </Button>
+            </StackPanel>
+          </DockPanel>
+        </HeaderedContentControl.Header>
+        <c:YearHeatmap x:Name="Heatmap" HorizontalAlignment="Left"/>
+      </HeaderedContentControl>
+
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="3*"/>
+          <ColumnDefinition Width="8"/>
+          <ColumnDefinition Width="2*" MinWidth="380"/>
+        </Grid.ColumnDefinitions>
+
+        <HeaderedContentControl Style="{StaticResource Section}" VerticalAlignment="Top">
+          <HeaderedContentControl.Header>
+            <DockPanel>
+              <TextBlock x:Name="MonthSummary" DockPanel.Dock="Right" FontWeight="Normal" Foreground="#8F8F8F" VerticalAlignment="Center"/>
+              <StackPanel Orientation="Horizontal">
+                <Button Style="{StaticResource NavButton}" Click="OnPrevMonth" ToolTip="Previous month">
+                  <Path Data="{StaticResource ArrowLeft}" Fill="#D0D0D0"/>
+                </Button>
+                <TextBlock x:Name="MonthLabel" Width="130" TextAlignment="Center" VerticalAlignment="Center"/>
+                <Button Style="{StaticResource NavButton}" Click="OnNextMonth" ToolTip="Next month">
+                  <Path Data="{StaticResource ArrowRight}" Fill="#D0D0D0"/>
+                </Button>
+                <Button Content="Today" Margin="8,0,0,0" Click="OnToday" FontWeight="Normal"/>
+              </StackPanel>
+            </DockPanel>
+          </HeaderedContentControl.Header>
+          <c:MonthCalendar x:Name="Month" Height="430"/>
+        </HeaderedContentControl>
+
+        <HeaderedContentControl Grid.Column="2" Style="{StaticResource Section}" VerticalAlignment="Top">
+          <HeaderedContentControl.Header>
+            <TextBlock x:Name="DayHeader"/>
+          </HeaderedContentControl.Header>
+          <StackPanel>
+            <c:StatStrip x:Name="DayStats" Columns="4"/>
+            <c:DayTimeline x:Name="Timeline" Margin="0,4,0,14"/>
+            <TextBlock x:Name="DayProjectsLabel" Text="Projects" FontWeight="Bold" Margin="0,0,0,4"/>
+            <ItemsControl x:Name="DayProjects" ItemTemplate="{StaticResource ShareRow}" Margin="0,0,0,14"/>
+            <TextBlock Text="Sessions" FontWeight="Bold" Margin="0,0,0,4"/>
+            <ItemsControl x:Name="DaySessions">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Grid Height="24">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="96"/>
+                      <ColumnDefinition Width="22"/>
+                      <ColumnDefinition/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Range}" Foreground="#8F8F8F" VerticalAlignment="Center"/>
+                    <c:ProjectIcon Grid.Column="1" Source="{Binding Project}" Width="14" Height="14" HorizontalAlignment="Left"/>
+                    <TextBlock Grid.Column="2" VerticalAlignment="Center" TextTrimming="CharacterEllipsis">
+                      <Run Text="{Binding Name, Mode=OneWay}"/><Run Text="{Binding ScenesSuffix, Mode=OneWay}" Foreground="#8F8F8F"/>
+                    </TextBlock>
+                    <TextBlock Grid.Column="3" Text="{Binding WorkText}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock x:Name="DayEmpty" Text="No activity on this day." Foreground="#8F8F8F"/>
+          </StackPanel>
+        </HeaderedContentControl>
+      </Grid>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

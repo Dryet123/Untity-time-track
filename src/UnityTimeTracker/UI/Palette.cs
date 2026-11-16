@@ -80,6 +80,6 @@ public static class Palette
     }
 
     public static FormattedText Label(Visual v, string s, double size, Brush brush, bool bold = false) =>
-        new(s, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, bold ? BoldFace : Regular, size, brush,
-            VisualTreeHelper.GetDpi(v).PixelsPerDip);
+        new(s, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, bold ? BoldFace : Regular, size, brush, null,
+            TextFormattingMode.Display, VisualTreeHelper.GetDpi(v).PixelsPerDip);
 }

@@ -10,6 +10,7 @@ namespace UnityTimeTracker.UI;
 public partial class MainWindow : Window
 {
     readonly OverviewView overview = new();
+    readonly CalendarView calendar = new();
     readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromSeconds(10) };
     IView? current;
 
@@ -44,7 +45,7 @@ public partial class MainWindow : Window
 
     void OnTab(object sender, RoutedEventArgs e)
     {
-        current = sender == TabOverview ? overview : null;
+        current = sender == TabCalendar ? calendar : overview;
         Host.Content = current;
         RefreshCurrent();
     }
