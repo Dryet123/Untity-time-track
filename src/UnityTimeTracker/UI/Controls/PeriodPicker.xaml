@@ -1,0 +1,19 @@
+<UserControl x:Class="UnityTimeTracker.UI.Controls.PeriodPicker"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <StackPanel Orientation="Horizontal">
+    <RadioButton x:Name="KindDay" Style="{StaticResource SegButton}" Content="Day" Checked="OnKind"/>
+    <RadioButton x:Name="KindWeek" Style="{StaticResource SegButton}" Content="Week" Margin="-1,0,0,0" Checked="OnKind"/>
+    <RadioButton x:Name="KindMonth" Style="{StaticResource SegButton}" Content="Month" Margin="-1,0,0,0" Checked="OnKind"/>
+    <RadioButton x:Name="KindYear" Style="{StaticResource SegButton}" Content="Year" Margin="-1,0,0,0" Checked="OnKind"/>
+    <RadioButton x:Name="KindAll" Style="{StaticResource SegButton}" Content="All time" Margin="-1,0,0,0" Checked="OnKind"/>
+    <Button x:Name="PrevButton" Style="{StaticResource NavButton}" Margin="16,0,0,0" Click="OnPrev" ToolTip="Previous">
+      <Path Data="{StaticResource ArrowLeft}" Fill="#D0D0D0"/>
+    </Button>
+    <TextBlock x:Name="LabelText" Width="190" TextAlignment="Center" VerticalAlignment="Center" Foreground="#E2E2E2"/>
+    <Button x:Name="NextButton" Style="{StaticResource NavButton}" Click="OnNext" ToolTip="Next">
+      <Path Data="{StaticResource ArrowRight}" Fill="#D0D0D0"/>
+    </Button>
+    <Button x:Name="CurrentButton" Content="Current" Margin="8,0,0,0" Click="OnCurrent"/>
+  </StackPanel>
+</UserControl>

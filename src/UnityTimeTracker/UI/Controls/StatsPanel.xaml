@@ -1,0 +1,52 @@
+<UserControl x:Class="UnityTimeTracker.UI.Controls.StatsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:UnityTimeTracker.UI.Controls">
+  <StackPanel>
+    <Border Background="#383838" Padding="10,7" Margin="0,0,0,8">
+      <c:PeriodPicker x:Name="Picker" PeriodChanged="OnPeriodChanged"/>
+    </Border>
+
+    <HeaderedContentControl Style="{StaticResource Section}" Header="Summary">
+      <c:StatStrip x:Name="Summary"/>
+    </HeaderedContentControl>
+
+    <HeaderedContentControl x:Name="TimeSection" Style="{StaticResource Section}" Header="Time">
+      <c:BarChart x:Name="TimeChart" Height="230"/>
+    </HeaderedContentControl>
+
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition/>
+        <ColumnDefinition Width="8"/>
+        <ColumnDefinition/>
+      </Grid.ColumnDefinitions>
+      <HeaderedContentControl Style="{StaticResource Section}" Header="Hour of day">
+        <c:BarChart x:Name="HourChart" Height="160"/>
+      </HeaderedContentControl>
+      <HeaderedContentControl Grid.Column="2" Style="{StaticResource Section}" Header="Day of week">
+        <c:BarChart x:Name="WeekdayChart" Height="160"/>
+      </HeaderedContentControl>
+    </Grid>
+
+    <Grid>
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition/>
+        <ColumnDefinition Width="8"/>
+        <ColumnDefinition/>
+      </Grid.ColumnDefinitions>
+      <HeaderedContentControl x:Name="ProjectsSection" Style="{StaticResource Section}" Header="Projects">
+        <Grid>
+          <ItemsControl x:Name="ProjectList" ItemTemplate="{StaticResource ShareRow}" MouseLeftButtonUp="OnProjectRowClick" Cursor="Hand"/>
+          <TextBlock x:Name="ProjectsEmpty" Text="No activity in this period." Foreground="#8F8F8F"/>
+        </Grid>
+      </HeaderedContentControl>
+      <HeaderedContentControl x:Name="ScenesSection" Grid.Column="2" Style="{StaticResource Section}" Header="Top scenes">
+        <Grid>
+          <ItemsControl x:Name="SceneList" ItemTemplate="{StaticResource ShareRow}"/>
+          <TextBlock x:Name="ScenesEmpty" Text="No scenes in this period." Foreground="#8F8F8F"/>
+        </Grid>
+      </HeaderedContentControl>
+    </Grid>
+  </StackPanel>
+</UserControl>

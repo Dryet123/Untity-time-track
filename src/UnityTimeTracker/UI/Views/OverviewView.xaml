@@ -1,0 +1,8 @@
+<UserControl x:Class="UnityTimeTracker.UI.Views.OverviewView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:UnityTimeTracker.UI.Controls">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <c:StatsPanel x:Name="Panel" Margin="8"/>
+  </ScrollViewer>
+</UserControl>

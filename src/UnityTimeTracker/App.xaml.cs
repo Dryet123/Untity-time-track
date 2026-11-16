@@ -24,6 +24,7 @@ public partial class App : Application
         DispatcherUnhandledException += (_, a) => { Log.Error(a.Exception); a.Handled = true; };
 
         Settings = AppSettings.Load();
+        Clock.Offset = Settings.DayStartHour;
         Db = new Database(AppPaths.Database);
         try { UnityHub.Import(Db); }
         catch (Exception ex) { Log.Error(ex); }
