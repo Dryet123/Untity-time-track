@@ -34,7 +34,7 @@ public sealed class YearHeatmap : FrameworkElement
         this.snap = snap;
         this.data = data;
         this.selected = selected;
-        tip.Hide();
+        tip.Invalidate();
         InvalidateVisual();
     }
 
@@ -120,7 +120,7 @@ public sealed class YearHeatmap : FrameworkElement
             tip.Hide();
             return;
         }
-        tip.Show(p, day, Fmt.Day(day), HoverTip.Breakdown(snap, data.GetValueOrDefault(day)));
+        tip.Show(p, day, Fmt.Day(day), HoverTip.DayLines(snap, day, data.GetValueOrDefault(day)));
     }
 
     protected override void OnMouseLeave(MouseEventArgs e)

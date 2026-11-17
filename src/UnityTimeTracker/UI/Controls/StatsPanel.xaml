@@ -31,6 +31,20 @@
 
     <Grid>
       <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="2*"/>
+        <ColumnDefinition Width="8"/>
+        <ColumnDefinition/>
+      </Grid.ColumnDefinitions>
+      <HeaderedContentControl Style="{StaticResource Section}" Header="Weekly rhythm">
+        <c:RhythmChart x:Name="Rhythm"/>
+      </HeaderedContentControl>
+      <HeaderedContentControl Grid.Column="2" Style="{StaticResource Section}" Header="Session lengths">
+        <c:BarChart x:Name="LengthChart" Height="144"/>
+      </HeaderedContentControl>
+    </Grid>
+
+    <Grid>
+      <Grid.ColumnDefinitions>
         <ColumnDefinition/>
         <ColumnDefinition Width="8"/>
         <ColumnDefinition/>

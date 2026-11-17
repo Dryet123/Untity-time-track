@@ -61,6 +61,9 @@ public sealed class HoverTip
         key = null;
     }
 
+    // Forces the next Show to rebuild its content (the data under the same key changed).
+    public void Invalidate() => key = null;
+
     void Build(string header, IEnumerable<TipLine> lines)
     {
         body.Children.Clear();
@@ -96,6 +99,22 @@ public sealed class HoverTip
             .Select(kv => new TipLine(Palette.Of(snap.Get(kv.Key)), snap.Get(kv.Key)?.Title ?? "Unknown", Fmt.Dur(kv.Value)))
             .ToList();
         if (lines.Count > 1) lines.Add(new TipLine(null, "Total", Fmt.Dur(Stats.Total(perProject)), true));
+        return lines;
+    }
+
+    // Breakdown plus goal status and the first line of the day's note.
+    public static List<TipLine> DayLines(DataSnapshot snap, DateOnly day, Dictionary<long, TimeSpan>? perProject)
+    {
+        var lines = Breakdown(snap, perProject);
+        var goal = App.Settings.DailyGoal;
+        var total = Stats.Total(perProject);
+        if (goal > TimeSpan.Zero && total > TimeSpan.Zero)
+            lines.Add(new TipLine(null, total >= goal ? "Goal reached" : "Goal", total >= goal ? "" : $"{Fmt.Pct(total / goal)} of {Fmt.Dur(goal)}"));
+        if (snap.Notes.TryGetValue(day, out var note))
+        {
+            var first = note.Split('\n')[0].Trim();
+            lines.Add(new TipLine(null, first.Length > 60 ? first[..57] + "..." : first, ""));
+        }
         return lines;
     }
 }

@@ -21,6 +21,7 @@ public partial class StatsPanel : UserControl
     public StatsPanel()
     {
         InitializeComponent();
+        LengthChart.CountUnit = ("session", "sessions");
         TimeChart.GroupClicked += i =>
         {
             if (i < drill.Count && drill[i] is Period p) Picker.Period = p;
@@ -49,8 +50,12 @@ public partial class StatsPanel : UserControl
     public void Refresh(DataSnapshot d)
     {
         snap = d;
+        Picker.FollowToday();
         Render();
     }
+
+    public void Shift(int n) => Picker.Shift(n);
+    public void GoToCurrent() => Picker.GoToCurrent();
 
     void OnPeriodChanged(object? sender, EventArgs e)
     {
@@ -71,8 +76,14 @@ public partial class StatsPanel : UserControl
         var lastDay = to < Clock.Today.AddDays(1) ? to : Clock.Today.AddDays(1);
         int daysInRange = Math.Max(0, lastDay.DayNumber - from.DayNumber);
 
-        RenderSummary(d, range, work, totals, perDay, daysInRange);
+        var sessions = d.WorkSessions(projectId).Where(s => range.Contains(s.Start)).ToList();
+        RenderSummary(d, period, range, all, work, totals, perDay, daysInRange, sessions);
         RenderTimeChart(d, period, from, to, work);
+        Rhythm.SetData(Stats.Rhythm(work, range));
+        var lengths = Stats.SessionLengths(sessions);
+        LengthChart.SetData(Stats.LengthBuckets
+            .Select((b, i) => new BarChart.Group(b.Label, $"Sessions {b.Label}", [new BarChart.Segment(lengths[i], Palette.AccentColor, "Sessions")]))
+            .ToList());
 
         var hours = Stats.HourOfDay(work, range);
         HourChart.SetData(Enumerable.Range(0, 24)
@@ -92,10 +103,9 @@ public partial class StatsPanel : UserControl
         RenderScenes(d, all, range, totals);
     }
 
-    void RenderSummary(DataSnapshot d, TimeRange range, List<SpanRec> work, Totals totals,
-        Dictionary<DateOnly, Dictionary<long, TimeSpan>> perDay, int daysInRange)
+    void RenderSummary(DataSnapshot d, Period period, TimeRange range, List<SpanRec> all, List<SpanRec> work, Totals totals,
+        Dictionary<DateOnly, Dictionary<long, TimeSpan>> perDay, int daysInRange, List<WorkSession> sessions)
     {
-        var sessions = d.WorkSessions(projectId).Where(s => range.Contains(s.Start)).ToList();
         var longest = sessions.MaxBy(s => s.Work);
         var launches = d.EditorSessions(projectId).Where(s => range.Contains(s.Start)).Select(s => (s.ProjectId, s.Pid)).Distinct().Count();
         int worked = perDay.Count(kv => Stats.Total(kv.Value) >= TimeSpan.FromMinutes(1));
@@ -104,20 +114,78 @@ public partial class StatsPanel : UserControl
         var usual = Stats.UsualHours(work, range);
         var hours = Stats.HourOfDay(work, range);
         int peakHour = Array.IndexOf(hours, hours.Max());
+        var focus = Stats.Focus(all, range);
+        var scenes = all.Where(s => s.Kind == SpanKind.Editor && s.Scene != null && range.Overlap(s.Start, s.End) > TimeSpan.Zero)
+            .Select(s => (s.ProjectId, s.Scene)).Distinct().Count();
+        var (compare, compareTip) = Compare(d, period, range, totals.Work);
 
         Summary.Set(
-            new Stat("Total", Fmt.Dur(totals.Work), "Unity and IDE"),
+            new Stat("Total", Fmt.Dur(totals.Work), compare ?? "Unity and IDE", compareTip),
             new Stat("In Unity", Fmt.Dur(totals.Editor), totals.Open > TimeSpan.Zero ? $"{Fmt.Pct(totals.Editor / totals.Open)} of open time" : "focused and not idle"),
             new Stat("In IDE", Fmt.Dur(totals.Ide), App.Settings.TrackIde ? "Rider, VS, VS Code" : "turned off"),
             new Stat("Unity open", Fmt.Dur(totals.Open), Fmt.Plural(launches, "launch", "launches")),
-            new Stat("Sessions", sessions.Count.ToString(), sessions.Count > 0 ? $"avg {Fmt.Dur(totals.Work / sessions.Count)}" : "split by 10 min breaks"),
+            new Stat("Sessions", sessions.Count.ToString(), sessions.Count > 0 ? $"avg {Fmt.Dur(sessions.Aggregate(TimeSpan.Zero, (a, s) => a + s.Work) / sessions.Count)}" : "split by 10 min breaks"),
             new Stat("Longest session", longest != null ? Fmt.Dur(longest.Work) : "-", longest != null ? Fmt.Day(Clock.DayOf(longest.Start)) : null),
             new Stat("Days worked", worked.ToString(), $"of {daysInRange}"),
             new Stat("Daily average", worked > 0 ? Fmt.Dur(totals.Work / worked) : "-", "on days worked"),
             new Stat("Best day", best.Time > TimeSpan.Zero ? Fmt.Dur(best.Time) : "-", best.Time > TimeSpan.Zero ? Fmt.Day(best.Day) : null),
             new Stat("Streak", Fmt.Plural(streak, "day", "days"), $"best {Fmt.Plural(bestStreak, "day", "days")}"),
             new Stat("Usual hours", usual is { } u ? $"{Fmt.ClockTime(u.Start)} - {Fmt.ClockTime(u.End)}" : "-", "median start and end"),
-            new Stat("Peak hour", hours[peakHour] > 0 ? $"{peakHour:00}:00" : "-", hours[peakHour] > 0 ? $"{Fmt.Hours(hours[peakHour])} in total" : null));
+            new Stat("Peak hour", hours[peakHour] > 0 ? $"{peakHour:00}:00" : "-", hours[peakHour] > 0 ? $"{Fmt.Hours(hours[peakHour])} in total" : null),
+            GoalStat(period, perDay, daysInRange),
+            new Stat("Average focus", focus != null ? Fmt.Dur(focus.Average) : "-", "uninterrupted Unity time",
+                "Unity in front without switching away. Scene changes don't break a stretch."),
+            new Stat("Longest focus", focus != null ? Fmt.Dur(focus.Longest) : "-", focus != null ? Fmt.Plural(focus.Stretches, "stretch", "stretches") : null),
+            new Stat("Interruptions", focus != null ? $"{focus.PerHour:0.0} / h" : "-", "times Unity was left",
+                "How often per hour of Unity time you switched to another window."),
+            new Stat("Scenes", scenes.ToString(), "worked on"),
+            projectId == null
+                ? new Stat("Projects", Stats.PerProject(work, range).Count.ToString(), "with activity")
+                : ShareStat(d, range, totals.Work));
+    }
+
+    Stat GoalStat(Period period, Dictionary<DateOnly, Dictionary<long, TimeSpan>> perDay, int daysInRange)
+    {
+        var goal = App.Settings.DailyGoal;
+        if (goal <= TimeSpan.Zero) return new Stat("Daily goal", "-", "set it in Settings");
+        if (period.Kind == PeriodKind.Day)
+        {
+            var done = Stats.Total(perDay.GetValueOrDefault(period.Anchor));
+            return new Stat("Daily goal", Fmt.Pct(Math.Min(9.99, done / goal)), $"{Fmt.Dur(done)} of {Fmt.Dur(goal)}");
+        }
+        int hit = perDay.Count(kv => Stats.Total(kv.Value) >= goal);
+        return new Stat("Daily goal", $"{hit} / {daysInRange}", $"days with {Fmt.Dur(goal)} or more");
+    }
+
+    Stat ShareStat(DataSnapshot d, TimeRange range, TimeSpan mine)
+    {
+        var everything = Stats.Sum(d.Work(null), range).Work;
+        return new Stat("Share", everything > TimeSpan.Zero ? Fmt.Pct(mine / everything) : "-", "of all tracked time");
+    }
+
+    // Compares with the previous period; a period still in progress is compared up to the same point.
+    (string? Text, string? Tip) Compare(DataSnapshot d, Period period, TimeRange range, TimeSpan current)
+    {
+        if (period.Kind == PeriodKind.All) return (null, null);
+        var (pf, pt) = period.Shift(-1).Days(d.FirstDay);
+        var prev = Clock.Range(pf, pt);
+        var now = DateTime.Now;
+        bool partial = range.Contains(now);
+        if (partial) prev = prev with { To = prev.From + (now - range.From) };
+        var before = Stats.Sum(d.Work(projectId), prev).Work;
+
+        var name = period.Kind switch
+        {
+            PeriodKind.Day => "the day before",
+            PeriodKind.Week => "last week",
+            PeriodKind.Month => "last month",
+            _ => "last year",
+        };
+        var diff = current - before;
+        var text = Math.Abs(diff.TotalMinutes) < 1 ? $"same as {name}"
+            : $"{(diff > TimeSpan.Zero ? "+" : "-")}{Fmt.Dur(diff.Duration())} vs {name}";
+        var tip = partial ? $"{Fmt.Dur(before)} by the same point of {name}." : $"{Fmt.Dur(before)} in {name}.";
+        return (text, tip);
     }
 
     void RenderTimeChart(DataSnapshot d, Period p, DateOnly from, DateOnly to, List<SpanRec> work)

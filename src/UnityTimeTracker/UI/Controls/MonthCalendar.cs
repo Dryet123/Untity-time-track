@@ -31,7 +31,7 @@ public sealed class MonthCalendar : FrameworkElement
         this.snap = snap;
         this.data = data;
         this.selected = selected;
-        tip.Hide();
+        tip.Invalidate();
         InvalidateVisual();
     }
 
@@ -82,6 +82,12 @@ public sealed class MonthCalendar : FrameworkElement
                 }
             }
 
+            var goal = App.Settings.DailyGoal;
+            if (goal > TimeSpan.Zero && total >= goal)
+                dc.DrawRectangle(Palette.Accent, null, new Rect(r.X, r.Y, r.Width, 2));
+            if (snap?.Notes.ContainsKey(d) == true)
+                dc.DrawRectangle(Palette.Brush(Palette.C(0xA8A8A8)), null, new Rect(r.Right - 11, r.Y + 7, 6, 6));
+
             if (d == selected) dc.DrawRectangle(null, Palette.SelectPen, new Rect(r.X + 1, r.Y + 1, r.Width - 2, r.Height - 2));
         }
     }
@@ -108,7 +114,7 @@ public sealed class MonthCalendar : FrameworkElement
             tip.Hide();
             return;
         }
-        tip.Show(p, day, Fmt.Day(day), HoverTip.Breakdown(snap, data.GetValueOrDefault(day)));
+        tip.Show(p, day, Fmt.Day(day), HoverTip.DayLines(snap, day, data.GetValueOrDefault(day)));
     }
 
     protected override void OnMouseLeave(MouseEventArgs e)

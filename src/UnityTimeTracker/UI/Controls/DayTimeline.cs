@@ -27,7 +27,7 @@ public sealed class DayTimeline : FrameworkElement
         this.range = range;
         this.spans = spans.Where(s => s.End > range.From && s.Start < range.To).ToList();
         this.snap = snap;
-        tip.Hide();
+        tip.Invalidate();
         InvalidateVisual();
     }
 

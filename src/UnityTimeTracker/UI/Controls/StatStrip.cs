@@ -4,7 +4,7 @@ using System.Windows.Controls.Primitives;
 
 namespace UnityTimeTracker.UI.Controls;
 
-public sealed record Stat(string Label, string Value, string? Sub = null);
+public sealed record Stat(string Label, string Value, string? Sub = null, string? Tip = null);
 
 public sealed class StatStrip : UniformGrid
 {
@@ -18,7 +18,8 @@ public sealed class StatStrip : UniformGrid
         Children.Clear();
         foreach (var s in stats)
         {
-            var cell = new StackPanel { Margin = new Thickness(0, 2, 14, 10) };
+            var cell = new StackPanel { Margin = new Thickness(0, 2, 14, 10), Background = System.Windows.Media.Brushes.Transparent };
+            if (s.Tip != null) cell.ToolTip = s.Tip;
             cell.Children.Add(new TextBlock { Text = s.Label, Foreground = Palette.Dim, FontSize = 11, TextTrimming = TextTrimming.CharacterEllipsis });
             cell.Children.Add(new TextBlock { Text = s.Value, Foreground = Palette.Strong, FontSize = 18, Margin = new Thickness(0, 4, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis });
             if (s.Sub != null)

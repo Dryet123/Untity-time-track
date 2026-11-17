@@ -100,6 +100,7 @@ public sealed class WorkSession
     public TimeSpan Editor { get; set; }
     public TimeSpan Ide { get; set; }
     public TimeSpan Work => Editor + Ide;
+    public bool Manual { get; set; }
     public Dictionary<string, TimeSpan> Scenes { get; } = [];
 }
 
@@ -111,6 +112,7 @@ public sealed class DataSnapshot
     public required IReadOnlyDictionary<long, Project> ById { get; init; }
     public required IReadOnlyList<SpanRec> Spans { get; init; }
     public required IReadOnlyList<SessionRec> Sessions { get; init; }
+    public required IReadOnlyDictionary<DateOnly, string> Notes { get; init; }
 
     public static DataSnapshot Load(Database db)
     {
@@ -121,8 +123,13 @@ public sealed class DataSnapshot
             ById = projects.ToDictionary(p => p.Id),
             Spans = db.LoadSpans(),
             Sessions = db.LoadSessions(),
+            Notes = db.LoadNotes(),
         };
     }
+
+    // Cheap fingerprint used to skip redrawing when nothing changed.
+    public string Signature =>
+        $"{Spans.Count}|{(Spans.Count > 0 ? Spans.Max(s => s.End).Ticks : 0)}|{string.Join(",", Projects.Select(p => $"{p.Id}{p.Title}{p.Color}{p.Icon}{p.Hidden}"))}|{Notes.Count}|{Notes.Values.Sum(n => n.Length)}";
 
     public DateOnly FirstDay => Spans.Count > 0 ? Clock.DayOf(Spans[0].Start) : Clock.Today;
 
@@ -262,6 +269,7 @@ public static class Stats
             {
                 ws.End = s.End;
             }
+            if (s.Manual) ws.Manual = true;
 
             if (s.Kind == SpanKind.Ide)
             {
@@ -348,5 +356,67 @@ public static class Stats
             if (o > TimeSpan.Zero) map[(s.ProjectId, s.Scene)] = map.GetValueOrDefault((s.ProjectId, s.Scene)) + o;
         }
         return map.OrderByDescending(kv => kv.Value).Select(kv => (kv.Key.Item1, kv.Key.Item2, kv.Value)).ToList();
+    }
+
+    public sealed record FocusStats(int Stretches, TimeSpan Average, TimeSpan Longest, double PerHour);
+
+    // A focus stretch is uninterrupted Unity time: editor spans less than 30 s apart (scene switches) merge into one.
+    public static FocusStats? Focus(IEnumerable<SpanRec> spans, TimeRange r)
+    {
+        var gap = TimeSpan.FromSeconds(30);
+        var stretches = new List<TimeSpan>();
+        DateTime start = default, end = default;
+        foreach (var s in spans.Where(s => s.Kind == SpanKind.Editor && !s.Manual && s.End > r.From && s.Start < r.To).OrderBy(s => s.Start))
+        {
+            var a = s.Start < r.From ? r.From : s.Start;
+            var b = s.End > r.To ? r.To : s.End;
+            if (stretches.Count > 0 && a - end <= gap)
+            {
+                if (b > end) end = b;
+                stretches[^1] = end - start;
+            }
+            else
+            {
+                start = a;
+                end = b;
+                stretches.Add(b - a);
+            }
+        }
+        var total = stretches.Aggregate(TimeSpan.Zero, (x, y) => x + y);
+        if (stretches.Count == 0 || total < TimeSpan.FromMinutes(5)) return null;
+        return new FocusStats(stretches.Count, total / stretches.Count, stretches.Max(), stretches.Count / total.TotalHours);
+    }
+
+    // Hours of work per [weekday, clock hour].
+    public static double[,] Rhythm(IEnumerable<SpanRec> work, TimeRange r)
+    {
+        var grid = new double[7, 24];
+        foreach (var span in work)
+        {
+            var s = span.Start < r.From ? r.From : span.Start;
+            var e = span.End > r.To ? r.To : span.End;
+            while (s < e)
+            {
+                var next = new DateTime(s.Year, s.Month, s.Day, s.Hour, 0, 0).AddHours(1);
+                var b = e < next ? e : next;
+                grid[Clock.Weekday(DateOnly.FromDateTime(s)), s.Hour] += (b - s).TotalHours;
+                s = b;
+            }
+        }
+        return grid;
+    }
+
+    public static readonly (string Label, TimeSpan Max)[] LengthBuckets =
+    [
+        ("<15m", TimeSpan.FromMinutes(15)), ("15-30m", TimeSpan.FromMinutes(30)), ("30m-1h", TimeSpan.FromHours(1)),
+        ("1-2h", TimeSpan.FromHours(2)), ("2-4h", TimeSpan.FromHours(4)), ("4h+", TimeSpan.MaxValue),
+    ];
+
+    public static int[] SessionLengths(IEnumerable<WorkSession> sessions)
+    {
+        var counts = new int[LengthBuckets.Length];
+        foreach (var s in sessions)
+            counts[Array.FindIndex(LengthBuckets, b => s.Work < b.Max)]++;
+        return counts;
     }
 }

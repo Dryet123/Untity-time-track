@@ -7,6 +7,7 @@ namespace UnityTimeTracker.UI.Controls;
 public partial class PeriodPicker : UserControl
 {
     Period period = new(PeriodKind.Week, Clock.Today);
+    DateOnly seenToday = Clock.Today;
     bool syncing;
 
     public event EventHandler? PeriodChanged;
@@ -23,10 +24,35 @@ public partial class PeriodPicker : UserControl
         set
         {
             period = value;
+            seenToday = Clock.Today;
             Sync();
             PeriodChanged?.Invoke(this, EventArgs.Empty);
         }
     }
+
+    bool IsCurrent(DateOnly today)
+    {
+        var (from, to) = period.Days(today);
+        return today >= from && today < to;
+    }
+
+    // The app runs for days from autostart; a period showing "now" should move on with the calendar.
+    public void FollowToday()
+    {
+        var today = Clock.Today;
+        if (today == seenToday) return;
+        bool wasCurrent = period.Kind != PeriodKind.All && IsCurrent(seenToday);
+        seenToday = today;
+        if (wasCurrent) period = period with { Anchor = today };
+        Sync();
+    }
+
+    public void Shift(int n)
+    {
+        if (period.Kind != PeriodKind.All) Period = period.Shift(n);
+    }
+
+    public void GoToCurrent() => Period = period with { Anchor = Clock.Today };
 
     void Sync()
     {
@@ -41,8 +67,7 @@ public partial class PeriodPicker : UserControl
         LabelText.Text = period.Label;
         bool movable = period.Kind != PeriodKind.All;
         PrevButton.IsEnabled = NextButton.IsEnabled = movable;
-        var current = period with { Anchor = Clock.Today };
-        CurrentButton.IsEnabled = movable && period.Days(Clock.Today) != current.Days(Clock.Today);
+        CurrentButton.IsEnabled = movable && !IsCurrent(Clock.Today);
     }
 
     void OnKind(object sender, RoutedEventArgs e)
@@ -56,7 +81,7 @@ public partial class PeriodPicker : UserControl
         Period = period with { Kind = kind };
     }
 
-    void OnPrev(object sender, RoutedEventArgs e) => Period = period.Shift(-1);
-    void OnNext(object sender, RoutedEventArgs e) => Period = period.Shift(1);
-    void OnCurrent(object sender, RoutedEventArgs e) => Period = period with { Anchor = Clock.Today };
+    void OnPrev(object sender, RoutedEventArgs e) => Shift(-1);
+    void OnNext(object sender, RoutedEventArgs e) => Shift(1);
+    void OnCurrent(object sender, RoutedEventArgs e) => GoToCurrent();
 }
