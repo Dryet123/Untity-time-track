@@ -10,7 +10,7 @@ if (Get-Process UnityTimeTracker -ErrorAction SilentlyContinue) {
 }
 
 dotnet publish "$PSScriptRoot\src\UnityTimeTracker" -c Release -r win-x64 --self-contained false `
-    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o $Target
+    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none -o $Target
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Start-Process $exe

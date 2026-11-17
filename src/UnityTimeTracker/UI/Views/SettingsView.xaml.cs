@@ -11,6 +11,8 @@ public partial class SettingsView : UserControl, IView
 {
     static readonly int[] IdleChoices = [1, 2, 5, 10, 15, 30];
     static readonly int[] DayStartChoices = [0, 2, 3, 4, 5, 6];
+    static readonly int[] GoalChoices = [0, 60, 120, 180, 240, 360, 480];
+    static readonly int[] BreakChoices = [0, 45, 60, 90, 120];
 
     DataSnapshot? snap;
     bool loading;
@@ -21,8 +23,46 @@ public partial class SettingsView : UserControl, IView
     {
         InitializeComponent();
         AddOptions(IdleOptions, IdleChoices, m => $"{m} min", OnIdle);
+        AddOptions(GoalOptions, GoalChoices, m => m == 0 ? "Off" : $"{m / 60}h", OnGoal);
+        AddOptions(BreakOptions, BreakChoices, m => m == 0 ? "Off" : Fmt.Dur(TimeSpan.FromMinutes(m)).Replace(" 00m", ""), OnBreak);
         AddOptions(DayStartOptions, DayStartChoices, h => $"{h:00}:00", OnDayStart);
         DataPath.Text = $"Everything is stored in {AppPaths.DataDir}";
+    }
+
+    void OnGoal(object sender, RoutedEventArgs e)
+    {
+        if (loading) return;
+        App.Settings.DailyGoalMinutes = (int)((RadioButton)sender).Tag;
+        App.Settings.Save();
+        DataChanged?.Invoke();
+    }
+
+    void OnBreak(object sender, RoutedEventArgs e)
+    {
+        if (loading) return;
+        App.Settings.BreakReminderMinutes = (int)((RadioButton)sender).Tag;
+        App.Settings.Save();
+    }
+
+    void ShowBackupInfo()
+    {
+        var (count, newest) = Backup.Info();
+        BackupInfo.Text = count == 0
+            ? "A copy of the database is made once a day; none yet."
+            : $"A copy of the database is made once a day and the last 14 are kept. {Fmt.Plural(count, "copy", "copies")}, newest {Fmt.Ago(newest!.Value)}.";
+    }
+
+    void OnBackupNow(object sender, RoutedEventArgs e)
+    {
+        App.Settings.LastBackup = default;
+        Backup.RunIfDue(App.Db, App.Settings);
+        ShowBackupInfo();
+    }
+
+    void OnOpenBackups(object sender, RoutedEventArgs e)
+    {
+        Directory.CreateDirectory(Backup.Folder);
+        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{Backup.Folder}\"") { UseShellExecute = true });
     }
 
     void AddOptions(StackPanel host, int[] values, Func<int, string> label, RoutedEventHandler handler)
@@ -45,8 +85,11 @@ public partial class SettingsView : UserControl, IView
         IdeBox.IsChecked = App.Settings.TrackIde;
         foreach (RadioButton b in IdleOptions.Children) b.IsChecked = (int)b.Tag == App.Settings.IdleMinutes;
         foreach (RadioButton b in DayStartOptions.Children) b.IsChecked = (int)b.Tag == App.Settings.DayStartHour;
+        foreach (RadioButton b in GoalOptions.Children) b.IsChecked = (int)b.Tag == App.Settings.DailyGoalMinutes;
+        foreach (RadioButton b in BreakOptions.Children) b.IsChecked = (int)b.Tag == App.Settings.BreakReminderMinutes;
         loading = false;
         ShowAutostartInfo();
+        ShowBackupInfo();
     }
 
     void ShowAutostartInfo()

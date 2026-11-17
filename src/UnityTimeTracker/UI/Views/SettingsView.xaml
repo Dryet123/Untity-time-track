@@ -22,6 +22,16 @@
           <TextBlock Foreground="#8F8F8F" Margin="0,5,0,0" TextWrapping="Wrap"
                      Text="Time stops counting after this long without keyboard or mouse input. The idle stretch itself is not counted."/>
 
+          <TextBlock Text="Daily goal" Margin="0,16,0,6"/>
+          <StackPanel x:Name="GoalOptions" Orientation="Horizontal"/>
+          <TextBlock Foreground="#8F8F8F" Margin="0,5,0,0" TextWrapping="Wrap"
+                     Text="Shown in the status bar and tray, marked on the calendar, counted in the summary."/>
+
+          <TextBlock Text="Break reminder" Margin="0,16,0,6"/>
+          <StackPanel x:Name="BreakOptions" Orientation="Horizontal"/>
+          <TextBlock Foreground="#8F8F8F" Margin="0,5,0,0" TextWrapping="Wrap"
+                     Text="A tray notification after this much work in a row. Five minutes away from Unity and the IDE resets it."/>
+
           <TextBlock Text="Day starts at" Margin="0,16,0,6"/>
           <StackPanel x:Name="DayStartOptions" Orientation="Horizontal"/>
           <TextBlock Foreground="#8F8F8F" Margin="0,5,0,0" TextWrapping="Wrap"
@@ -33,12 +43,43 @@
         <StackPanel>
           <TextBlock x:Name="DataPath" Foreground="#8F8F8F" TextWrapping="Wrap"/>
           <WrapPanel Margin="0,10,0,0">
-            <Button Content="Open data folder" Margin="0,0,6,0" Click="OnOpenData"/>
-            <Button Content="Export raw time (CSV)..." Margin="0,0,6,0" Click="OnExportRaw"/>
-            <Button Content="Import from Unity Hub" Click="OnImportHub"/>
+            <Button Content="Open data folder" Margin="0,0,6,6" Click="OnOpenData"/>
+            <Button Content="Export raw time (CSV)..." Margin="0,0,6,6" Click="OnExportRaw"/>
+            <Button Content="Import from Unity Hub" Margin="0,0,6,6" Click="OnImportHub"/>
           </WrapPanel>
-          <TextBlock x:Name="DataStatus" Foreground="#8F8F8F" Margin="0,8,0,0"/>
+          <TextBlock x:Name="BackupInfo" Foreground="#8F8F8F" Margin="0,8,0,0" TextWrapping="Wrap"/>
+          <WrapPanel Margin="0,8,0,0">
+            <Button Content="Back up now" Margin="0,0,6,6" Click="OnBackupNow"/>
+            <Button Content="Open backups folder" Margin="0,0,6,6" Click="OnOpenBackups"/>
+          </WrapPanel>
+          <TextBlock x:Name="DataStatus" Foreground="#8F8F8F" Margin="0,4,0,0"/>
         </StackPanel>
+      </HeaderedContentControl>
+
+      <HeaderedContentControl Style="{StaticResource Section}" Header="Keyboard">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="150"/>
+            <ColumnDefinition/>
+          </Grid.ColumnDefinitions>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="22"/>
+            <RowDefinition Height="22"/>
+            <RowDefinition Height="22"/>
+            <RowDefinition Height="22"/>
+            <RowDefinition Height="22"/>
+          </Grid.RowDefinitions>
+          <TextBlock Text="Ctrl+1 ... Ctrl+5" Foreground="#E2E2E2"/>
+          <TextBlock Grid.Column="1" Text="Switch tabs" Foreground="#9A9A9A"/>
+          <TextBlock Grid.Row="1" Text="Ctrl+Left, Ctrl+Right" Foreground="#E2E2E2"/>
+          <TextBlock Grid.Row="1" Grid.Column="1" Text="Previous or next period (month on the Calendar tab)" Foreground="#9A9A9A"/>
+          <TextBlock Grid.Row="2" Text="Ctrl+Home" Foreground="#E2E2E2"/>
+          <TextBlock Grid.Row="2" Grid.Column="1" Text="Back to the current period" Foreground="#9A9A9A"/>
+          <TextBlock Grid.Row="3" Text="Delete" Foreground="#E2E2E2"/>
+          <TextBlock Grid.Row="3" Grid.Column="1" Text="Delete the selected session in Log" Foreground="#9A9A9A"/>
+          <TextBlock Grid.Row="4" Text="F5" Foreground="#E2E2E2"/>
+          <TextBlock Grid.Row="4" Grid.Column="1" Text="Reload" Foreground="#9A9A9A"/>
+        </Grid>
       </HeaderedContentControl>
 
       <HeaderedContentControl Style="{StaticResource Section}" Header="How it works">

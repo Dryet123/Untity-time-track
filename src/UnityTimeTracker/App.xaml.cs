@@ -8,9 +8,11 @@ namespace UnityTimeTracker;
 
 public partial class App : Application
 {
-    const string InstanceName = @"Local\UnityTimeTracker.Instance";
-    const string ShowSignalName = @"Local\UnityTimeTracker.Show";
-    const string ExitSignalName = @"Local\UnityTimeTracker.Exit";
+    // One instance per data folder, so a test copy with UTT_DATA_DIR can run next to the real one.
+    static readonly string Scope = $@"Local\UnityTimeTracker.{StableHash(AppPaths.DataDir.ToLowerInvariant()):x8}";
+    static readonly string InstanceName = Scope + ".Instance";
+    static readonly string ShowSignalName = Scope + ".Show";
+    static readonly string ExitSignalName = Scope + ".Exit";
 
     public static Database Db { get; private set; } = null!;
     public static AppSettings Settings { get; private set; } = null!;
@@ -63,14 +65,29 @@ public partial class App : Application
         tray.OpenRequested += ShowMain;
         tray.PauseToggled += () => SetPaused(!Settings.Paused);
         tray.ExitRequested += ExitApp;
-        trayTimer.Tick += (_, _) => UpdateTray();
+        tray.MenuOpening += TodayByProject;
+        trayTimer.Tick += (_, _) =>
+        {
+            UpdateTray();
+            CheckBreak();
+            Backup.RunIfDue(Db, Settings);
+        };
         trayTimer.Start();
         UpdateTray();
+        Backup.RunIfDue(Db, Settings);
 
         showSignal = Listen(ShowSignalName, ShowMain);
         exitSignal = Listen(ExitSignalName, ExitApp);
 
         if (!e.Args.Contains("--tray", StringComparer.OrdinalIgnoreCase)) ShowMain();
+    }
+
+    // string.GetHashCode is randomized per process, so names shared between processes need their own hash.
+    static uint StableHash(string s)
+    {
+        uint h = 2166136261;
+        foreach (char c in s) h = (h ^ c) * 16777619;
+        return h;
     }
 
     static void Signal(string name)
@@ -127,11 +144,14 @@ public partial class App : Application
         tray?.Notify("Still tracking", "Unity Time Tracker keeps running in the tray. Right-click the icon to exit.");
     }
 
+    public event Action? PausedChanged;
+
     public void SetPaused(bool paused)
     {
         Settings.Paused = paused;
         Settings.Save();
         UpdateTray();
+        PausedChanged?.Invoke();
     }
 
     void UpdateTray()
@@ -140,7 +160,51 @@ public partial class App : Application
         var today = TimeSpan.Zero;
         try { today = Db.WorkBetween(Clock.Start(Clock.Today).ToUniversalTime(), DateTime.UtcNow); }
         catch (Exception ex) { Log.Error(ex); }
-        tray.Update(Tracker.Status, today, Settings.Paused);
+        tray.Update(Tracker.Status, today, Settings.DailyGoal, Settings.Paused);
+    }
+
+    List<(string Name, TimeSpan Time)> TodayByProject()
+    {
+        try
+        {
+            var names = Db.LoadProjects().ToDictionary(p => p.Id, p => p.Title);
+            return Db.WorkByProject(Clock.Start(Clock.Today).ToUniversalTime(), DateTime.UtcNow)
+                .OrderByDescending(kv => kv.Value)
+                .Select(kv => (names.GetValueOrDefault(kv.Key) ?? "Unknown", kv.Value))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex);
+            return [];
+        }
+    }
+
+    // Break reminder: counts continuous work; a pause of 5+ minutes resets it.
+    DateTime? workingSince;
+    DateTime lastWorking;
+    bool breakReminded;
+
+    void CheckBreak()
+    {
+        var now = DateTime.Now;
+        bool working = Tracker.Status.State is TrackerState.Active or TrackerState.Ide;
+        if (working)
+        {
+            workingSince ??= now;
+            lastWorking = now;
+        }
+        else if (now - lastWorking > TimeSpan.FromMinutes(5))
+        {
+            workingSince = null;
+            breakReminded = false;
+        }
+
+        int limit = Settings.BreakReminderMinutes;
+        if (limit <= 0 || breakReminded || workingSince is not DateTime since || !working) return;
+        if (now - since < TimeSpan.FromMinutes(limit)) return;
+        breakReminded = true;
+        tray?.Notify("Time for a break", $"You've been working for {Fmt.Dur(now - since)} without a real pause.");
     }
 
     public void ExitApp()

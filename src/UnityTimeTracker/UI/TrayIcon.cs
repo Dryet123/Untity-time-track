@@ -13,18 +13,23 @@ public sealed class TrayIcon : IDisposable
     readonly Drawing.Icon paused = Load("tray-paused.ico");
     readonly Forms.ToolStripMenuItem pauseItem;
 
+    readonly Forms.ContextMenuStrip menu;
+    readonly List<Forms.ToolStripItem> todayItems = [];
+
     public event Action? OpenRequested;
     public event Action? PauseToggled;
     public event Action? ExitRequested;
+    public event Func<List<(string Name, TimeSpan Time)>>? MenuOpening;
 
     public TrayIcon()
     {
-        var menu = new Forms.ContextMenuStrip
+        menu = new Forms.ContextMenuStrip
         {
             Renderer = new Forms.ToolStripProfessionalRenderer(new DarkMenuColors()) { RoundedEdges = false },
             ShowImageMargin = false,
             Font = new Drawing.Font("Arial", 9f),
         };
+        menu.Opening += (_, _) => FillToday();
         menu.Items.Add(Item("Open", () => OpenRequested?.Invoke()));
         pauseItem = Item("Pause tracking", () => PauseToggled?.Invoke());
         menu.Items.Add(pauseItem);
@@ -38,9 +43,14 @@ public sealed class TrayIcon : IDisposable
         };
     }
 
-    static Forms.ToolStripMenuItem Item(string text, Action onClick)
+    static Forms.ToolStripMenuItem Item(string text, Action onClick, bool bold = false, bool dim = false)
     {
-        var item = new Forms.ToolStripMenuItem(text) { ForeColor = Drawing.Color.FromArgb(220, 220, 220), Padding = new Forms.Padding(4, 3, 4, 3) };
+        var item = new Forms.ToolStripMenuItem(text)
+        {
+            ForeColor = dim ? Drawing.Color.FromArgb(160, 160, 160) : Drawing.Color.FromArgb(220, 220, 220),
+            Padding = new Forms.Padding(4, 3, 4, 3),
+        };
+        if (bold) item.Font = new Drawing.Font("Arial", 9f, Drawing.FontStyle.Bold);
         item.Click += (_, _) => onClick();
         return item;
     }
@@ -51,12 +61,28 @@ public sealed class TrayIcon : IDisposable
         return new Drawing.Icon(stream, Forms.SystemInformation.SmallIconSize);
     }
 
-    public void Update(TrackerStatus status, TimeSpan today, bool isPaused)
+    public void Update(TrackerStatus status, TimeSpan today, TimeSpan goal, bool isPaused)
     {
         icon.Icon = isPaused ? paused : status.State is TrackerState.Active or TrackerState.Ide ? active : idle;
-        var text = $"Unity Time Tracker\n{status.Describe()}\nToday {Fmt.Dur(today)}";
+        var todayText = goal > TimeSpan.Zero ? $"Today {Fmt.Dur(today)} of {Fmt.Dur(goal)}" : $"Today {Fmt.Dur(today)}";
+        var text = $"Unity Time Tracker\n{status.Describe()}\n{todayText}";
         icon.Text = text.Length > 127 ? text[..127] : text;
         pauseItem.Text = isPaused ? "Resume tracking" : "Pause tracking";
+    }
+
+    // Today's time per project at the top of the menu, rebuilt each time it opens.
+    void FillToday()
+    {
+        foreach (var item in todayItems) menu.Items.Remove(item);
+        todayItems.Clear();
+        var rows = MenuOpening?.Invoke() ?? [];
+        var total = rows.Aggregate(TimeSpan.Zero, (a, r) => a + r.Time);
+
+        todayItems.Add(Item($"Today {Fmt.Dur(total)}", () => OpenRequested?.Invoke(), bold: true));
+        foreach (var (name, time) in rows.Take(6))
+            todayItems.Add(Item($"    {name}  {Fmt.Dur(time)}", () => OpenRequested?.Invoke(), dim: true));
+        todayItems.Add(new Forms.ToolStripSeparator());
+        for (int i = 0; i < todayItems.Count; i++) menu.Items.Insert(i, todayItems[i]);
     }
 
     public void Notify(string title, string text) => icon.ShowBalloonTip(4000, title, text, Forms.ToolTipIcon.None);
