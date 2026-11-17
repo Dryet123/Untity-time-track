@@ -1,24 +1,51 @@
 # Unity Time Tracker
 
-Трекер времени в Unity для Windows (WPF, .NET 10, SQLite).
+A Windows time tracker for the Unity editor, built with WPF, .NET 10 and SQLite. It runs in the tray, finds running Unity editors on its own and keeps a log of where your time goes.
 
-- Сам находит запущенные редакторы Unity: проект берёт из `-projectPath`, сцену из заголовка окна.
-- Считает время, пока Unity открыт, и время, пока окно Unity активно и есть ввод с клавиатуры или мыши. Отдельно идёт время в Rider, Visual Studio, VS Code и Cursor, если в заголовке окна есть имя проекта.
-- Overview: метрики за день/неделю/месяц/год/всё время. Сравнение с прошлым периодом, дневная цель, фокус (непрерывные отрезки в Unity и частота отвлечений), графики по дням, часам и дням недели, недельный ритм (день × час), длины сессий, проекты и сцены.
-- Calendar: тепловая карта года, месяц с отметками цели и заметок, таймлайн дня, заметка к дню, ручное добавление времени.
-- Projects: информация о проекте (версия Unity и какие версии редактора использовались, пайплайн, git, скрипты, сцены), своя иконка, цвет, переименование, слияние двух проектов (если папку переносили), статистика и отчёт по проекту.
-- Log: сессии с фильтром, ручное добавление и удаление, экспорт в CSV, HTML-отчёт за период (открывается в браузере, печатается в PDF).
-- Трей: время за сегодня по проектам в меню, прогресс цели, напоминание о перерыве.
-- Раз в день делает копию базы и хранит последние 14.
-- Автозапуск через запись `Run` в реестре. Она видна в диспетчере задач на вкладке «Автозагрузка», включается и выключается там или в Settings.
-- Горячие клавиши: Ctrl+1…5 переключают вкладки, Ctrl+←/→ листают период, Ctrl+Home возвращает к текущему, Delete удаляет сессию в Log, F5 обновляет.
+## How it tracks
 
-## Установка
+Every second the tracker looks for running Unity editors. The project comes from the editor's `-projectPath` argument and the scene from its window title. Three kinds of time are kept apart: how long Unity was open, how long a Unity window was in front while you were actually using the keyboard or mouse, and time spent in Rider, Visual Studio, VS Code or Cursor when the window title mentions the project. Idle stretches and sleep are not counted.
+
+## Overview
+
+Totals for a day, week, month, year or all time, compared with the previous period. Daily goal progress, focus stats (uninterrupted stretches in Unity and how often you switched away), time per day, hour of day and weekday, a weekday by hour rhythm grid, session lengths, and the top projects and scenes.
+
+## Calendar
+
+A year heatmap, a month view that marks goal days and days with notes, a timeline for the selected day, a note for each day and a way to add time the tracker missed.
+
+## Projects
+
+Details read straight from the project folder: Unity version and which editor versions were used, render pipeline, git branch and remote, scripts and lines of code, scenes, prefabs and asset size. Each project can get its own icon, color and display name, and two projects can be merged when a folder was moved or renamed. The same charts as the overview, plus a report, for one project.
+
+## Log
+
+Every work session with its scenes, filterable by project or scene. Sessions can be added by hand or deleted, exported to CSV, or turned into a printable HTML report for the period.
+
+## Tray and background
+
+The tray menu shows today's time per project, the icon shows whether you are working right now, and an optional reminder suggests a break after a long stretch. The database is copied once a day and the last 14 copies are kept.
+
+## Autostart
+
+The app registers itself in the registry `Run` key, so it appears in Task Manager under Startup apps as Unity Time Tracker and can be turned on or off there or in Settings. It starts minimized to the tray.
+
+## Keyboard
+
+| Keys | Action |
+| --- | --- |
+| Ctrl+1 to Ctrl+5 | Switch tabs |
+| Ctrl+Left, Ctrl+Right | Previous or next period |
+| Ctrl+Home | Back to the current period |
+| Delete | Delete the selected session in Log |
+| F5 | Reload |
+
+## Install
 
 ```powershell
 .\publish.ps1
 ```
 
-Собирает Release в `%LOCALAPPDATA%\Programs\UnityTimeTracker`, закрывает запущенную копию и запускает новую. При первом запуске Release-сборка сама регистрирует автозапуск.
+This builds a Release copy into `%LOCALAPPDATA%\Programs\UnityTimeTracker`, closes the running copy and starts the new one. The Release build registers autostart on its first run.
 
-Данные лежат в `%LOCALAPPDATA%\UnityTimeTracker` (`tracker.db`, `settings.json`, `icons\`, `backups\`). Для тестов папку можно подменить переменной окружения `UTT_DATA_DIR`. Копия с другой папкой данных работает как отдельный экземпляр.
+Data lives in `%LOCALAPPDATA%\UnityTimeTracker` (`tracker.db`, `settings.json`, `icons\`, `backups\`). Set the `UTT_DATA_DIR` environment variable to point a test copy at another folder; a copy with its own data folder runs as a separate instance.
