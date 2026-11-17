@@ -8,39 +8,59 @@ using UnityTimeTracker.UI.Controls;
 
 namespace UnityTimeTracker.UI.Views;
 
-public partial class LogView : UserControl, IView
+public partial class LogView : UserControl, IView, IPeriodView
 {
     DataSnapshot? snap;
     List<SessionRow> rows = [];
-    (int Count, DateTime Last, TimeSpan Work) shown;
+    (int Count, DateTime Last, TimeSpan Work, string Filter) shown;
+
+    public event Action? DataChanged;
 
     public LogView()
     {
         InitializeComponent();
-        Picker.Period = new Period(PeriodKind.Month, Clock.Today);
+        Picker.Period = new Period(App.Settings.LogPeriod, Clock.Today);
     }
 
     public void Refresh(DataSnapshot d)
     {
         snap = d;
+        Picker.FollowToday();
         Render(false);
     }
 
+    public void Shift(int n) => Picker.Shift(n);
+    public void GoToCurrent() => Picker.GoToCurrent();
+
     void OnPeriodChanged(object? sender, EventArgs e)
     {
+        App.Settings.LogPeriod = Picker.Period.Kind;
         if (snap != null) Render(true);
     }
+
+    void OnFilterChanged(object sender, TextChangedEventArgs e)
+    {
+        FilterHint.Visibility = FilterBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (snap != null) Render(false);
+    }
+
+    bool Matches(SessionRow r, string filter) =>
+        filter.Length == 0
+        || r.Name.Contains(filter, StringComparison.OrdinalIgnoreCase)
+        || r.Session.Scenes.Keys.Any(s => s.Contains(filter, StringComparison.OrdinalIgnoreCase));
 
     void Render(bool force)
     {
         var d = snap!;
         var (from, to) = Picker.Period.Days(d.FirstDay);
         var range = Clock.Range(from, to);
-        var fresh = d.WorkSessions(null).Where(s => range.Contains(s.Start)).Select(s => SessionRow.From(s, d)).ToList();
+        var filter = FilterBox.Text.Trim();
+        var fresh = d.WorkSessions(null).Where(s => range.Contains(s.Start)).Select(s => SessionRow.From(s, d)).Where(r => Matches(r, filter)).ToList();
         var total = fresh.Aggregate(TimeSpan.Zero, (a, r) => a + r.Work);
 
         // Reassigning ItemsSource drops the user's sort and scroll, so only do it when something changed.
-        var signature = (fresh.Count, fresh.Count > 0 ? fresh.Max(r => r.End) : default, total);
+        var projects = string.Join(",", fresh.Select(r => $"{r.Session.ProjectId}{r.Name}{r.Project?.Icon}{r.Project?.Color}").Distinct());
+        var signature = (fresh.Count, fresh.Count > 0 ? fresh.Max(r => r.End) : default, total, filter + "|" + projects);
         if (force || signature != shown)
         {
             shown = signature;
@@ -62,6 +82,33 @@ public partial class LogView : UserControl, IView
         Footer.Text = rows.Count == 0
             ? Picker.Period.Label
             : $"{Fmt.Plural(rows.Count, "session", "sessions")} on {Fmt.Plural(days, "day", "days")}, {Fmt.Dur(total)} in total. A new session starts after a break longer than 10 minutes.";
+    }
+
+    void OnSelectionChanged(object sender, SelectionChangedEventArgs e) => DeleteButton.IsEnabled = Table.SelectedItem is SessionRow;
+
+    void OnTableKey(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key != System.Windows.Input.Key.Delete) return;
+        e.Handled = true;
+        OnDelete(sender, e);
+    }
+
+    void OnDelete(object sender, RoutedEventArgs e)
+    {
+        if (Table.SelectedItem is SessionRow row && Actions.DeleteSession(this, row)) DataChanged?.Invoke();
+    }
+
+    void OnAddTime(object sender, RoutedEventArgs e)
+    {
+        if (snap == null) return;
+        var (from, to) = Picker.Period.Days(snap.FirstDay);
+        var day = Clock.Today >= from && Clock.Today < to ? Clock.Today : to.AddDays(-1);
+        if (Actions.AddTime(this, snap, day, (Table.SelectedItem as SessionRow)?.Session.ProjectId)) DataChanged?.Invoke();
+    }
+
+    void OnReport(object sender, RoutedEventArgs e)
+    {
+        if (snap != null) Actions.SaveReport(this, snap, Picker.Period, null);
     }
 
     void OnExport(object sender, RoutedEventArgs e)

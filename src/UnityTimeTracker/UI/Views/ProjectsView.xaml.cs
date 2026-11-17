@@ -47,7 +47,7 @@ public sealed class ProjectRow(long id) : INotifyPropertyChanged
     void Changed(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
-public partial class ProjectsView : UserControl, IView
+public partial class ProjectsView : UserControl, IView, IPeriodView
 {
     readonly ObservableCollection<ProjectRow> rows = [];
     DataSnapshot? snap;
@@ -67,8 +67,12 @@ public partial class ProjectsView : UserControl, IView
         syncing = false;
 
         ProjectStats.ProjectId = 0;
-        ProjectStats.Period = new Period(PeriodKind.All, Clock.Today);
-        ProjectStats.PeriodChanged += (_, _) => RenderHeatmap();
+        ProjectStats.Period = new Period(App.Settings.ProjectPeriod, Clock.Today);
+        ProjectStats.PeriodChanged += (_, _) =>
+        {
+            App.Settings.ProjectPeriod = ProjectStats.Period.Kind;
+            RenderHeatmap();
+        };
         Heatmap.DayClicked += d => ProjectStats.Period = new Period(PeriodKind.Day, d);
 
         foreach (var hex in ProjectColors.All)
@@ -213,7 +217,16 @@ public partial class ProjectsView : UserControl, IView
         string loading = p.HasFolder ? "reading..." : "-";
 
         var spans = snap.Of(p.Id).ToList();
-        var launches = snap.EditorSessions(p.Id).Select(s => s.Pid).Distinct().Count();
+        var editorSessions = snap.EditorSessions(p.Id).ToList();
+        var launches = editorSessions.Select(s => s.Pid).Distinct().Count();
+        var versions = editorSessions.Where(s => s.Version != null)
+            .GroupBy(s => s.Version!)
+            .Select(g => (Version: g.Key, Time: g.Aggregate(TimeSpan.Zero, (a, s) => a + (s.End - s.Start))))
+            .OrderByDescending(v => v.Time)
+            .ToList();
+        var versionTotal = versions.Aggregate(TimeSpan.Zero, (a, v) => a + v.Time);
+        var versionText = versions.Count == 0 ? "-"
+            : string.Join(", ", versions.Select(v => versions.Count == 1 || versionTotal <= TimeSpan.Zero ? v.Version : $"{v.Version} ({Fmt.Pct(v.Time / versionTotal)})"));
         var info = new List<(string, string)>
         {
             ("Unity version", d?.UnityVersion ?? p.UnityVersion ?? "-"),
@@ -228,6 +241,8 @@ public partial class ProjectsView : UserControl, IView
             ("Tracked since", spans.Count > 0 ? Fmt.Day(Clock.DayOf(spans[0].Start)) : "not tracked yet"),
             ("Last active", spans.Count > 0 ? Fmt.Ago(spans.Max(s => s.End)) : p.LastOpened is DateTime lo ? Fmt.Ago(lo) : "-"),
             ("Editor launches", launches.ToString()),
+            ("Editors used", versionText),
+            ("Manual entries", Fmt.Plural(spans.Count(s => s.Manual && s.Kind != SpanKind.Open), "entry", "entries")),
         };
 
         InfoGrid.Children.Clear();
@@ -398,6 +413,21 @@ public partial class ProjectsView : UserControl, IView
         if (p == null) return;
         p.Hidden = !p.Hidden;
         Save(p);
+    }
+
+    public void Shift(int n) => ProjectStats.Shift(n);
+    public void GoToCurrent() => ProjectStats.GoToCurrent();
+
+    void OnReport(object sender, RoutedEventArgs e)
+    {
+        if (snap != null && Current is Project p) Actions.SaveReport(this, snap, ProjectStats.Period, p.Id);
+    }
+
+    void OnMerge(object sender, RoutedEventArgs e)
+    {
+        if (snap == null || Current is not Project p || !Actions.Merge(this, snap, p)) return;
+        selectedId = null;
+        DataChanged?.Invoke();
     }
 
     void OnDelete(object sender, RoutedEventArgs e)

@@ -22,7 +22,7 @@ public sealed class Project
     public bool HasFolder => !Folder.StartsWith(ProjectPaths.TitlePrefix, StringComparison.Ordinal);
 }
 
-public sealed record SpanRec(long Id, long ProjectId, long SessionId, SpanKind Kind, string? Scene, DateTime Start, DateTime End)
+public sealed record SpanRec(long Id, long ProjectId, long SessionId, SpanKind Kind, string? Scene, DateTime Start, DateTime End, bool Manual = false)
 {
     public TimeSpan Duration => End - Start;
 }

@@ -1,37 +1,60 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Threading;
 using UnityTimeTracker.Core;
 using UnityTimeTracker.UI.Controls;
 
 namespace UnityTimeTracker.UI.Views;
 
-public partial class CalendarView : UserControl, IView
+public partial class CalendarView : UserControl, IView, IPeriodView
 {
+    readonly DispatcherTimer noteSave = new() { Interval = TimeSpan.FromMilliseconds(800) };
     DataSnapshot? snap;
     int year = Clock.Today.Year;
     DateOnly month = new(Clock.Today.Year, Clock.Today.Month, 1);
     DateOnly day = Clock.Today;
+    DateOnly seenToday = Clock.Today;
+    DateOnly? noteDay;
+    bool loadingNote;
+
+    public event Action? DataChanged;
 
     public CalendarView()
     {
         InitializeComponent();
         Heatmap.DayClicked += Select;
         Month.DayClicked += Select;
+        noteSave.Tick += (_, _) => SaveNote();
     }
 
     public void Refresh(DataSnapshot d)
     {
         snap = d;
+        if (Clock.Today != seenToday)
+        {
+            if (day == seenToday) SetDay(Clock.Today);
+            seenToday = Clock.Today;
+        }
         Render();
     }
 
     public void Select(DateOnly d)
     {
+        SaveNote();
+        SetDay(d);
+        if (snap != null) Render();
+    }
+
+    void SetDay(DateOnly d)
+    {
         day = d;
         month = new DateOnly(d.Year, d.Month, 1);
         year = d.Year;
-        if (snap != null) Render();
     }
+
+    public void Shift(int n) => ShiftMonth(n);
+    public void GoToCurrent() => Select(Clock.Today);
 
     void Render()
     {
@@ -58,7 +81,9 @@ public partial class CalendarView : UserControl, IView
         var days = perDay.Where(kv => Stats.Total(kv.Value) >= TimeSpan.FromMinutes(1)).ToList();
         if (days.Count == 0) return "No activity";
         var total = days.Aggregate(TimeSpan.Zero, (a, kv) => a + Stats.Total(kv.Value));
-        return $"{Fmt.Dur(total)} in {Fmt.Plural(days.Count, "day", "days")}";
+        var goal = App.Settings.DailyGoal;
+        var hit = goal > TimeSpan.Zero ? $", goal met on {days.Count(kv => Stats.Total(kv.Value) >= goal)}" : "";
+        return $"{Fmt.Dur(total)} in {Fmt.Plural(days.Count, "day", "days")}{hit}";
     }
 
     void RenderDay(DataSnapshot d)
@@ -73,6 +98,14 @@ public partial class CalendarView : UserControl, IView
             new Stat("In IDE", Fmt.Dur(totals.Ide)),
             new Stat("Unity open", Fmt.Dur(totals.Open)));
         Timeline.SetData(range, all, d);
+
+        if (!NoteBox.IsKeyboardFocused || noteDay != day)
+        {
+            loadingNote = true;
+            NoteBox.Text = d.Notes.GetValueOrDefault(day) ?? "";
+            noteDay = day;
+            loadingNote = false;
+        }
 
         var per = Stats.PerProject(all, range).Where(kv => kv.Value.Work > TimeSpan.Zero).OrderByDescending(kv => kv.Value.Work).ToList();
         var max = per.Count > 0 ? per[0].Value.Work : TimeSpan.Zero;
@@ -91,6 +124,28 @@ public partial class CalendarView : UserControl, IView
         var sessions = d.WorkSessions(null).Where(s => s.End > range.From && s.Start < range.To).Select(s => SessionRow.From(s, d)).ToList();
         DaySessions.ItemsSource = sessions;
         DayEmpty.Visibility = sessions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    void OnNoteChanged(object sender, TextChangedEventArgs e)
+    {
+        if (loadingNote) return;
+        noteSave.Stop();
+        noteSave.Start();
+    }
+
+    void OnNoteLostFocus(object sender, KeyboardFocusChangedEventArgs e) => SaveNote();
+
+    void SaveNote()
+    {
+        if (!noteSave.IsEnabled || noteDay is not DateOnly d) return;
+        noteSave.Stop();
+        try { App.Db.SaveNote(d, NoteBox.Text); }
+        catch (Exception ex) { Log.Error(ex); }
+    }
+
+    void OnAddTime(object sender, RoutedEventArgs e)
+    {
+        if (snap != null && Actions.AddTime(this, snap, day, null)) DataChanged?.Invoke();
     }
 
     void OnPrevYear(object sender, RoutedEventArgs e) => ShiftYear(-1);

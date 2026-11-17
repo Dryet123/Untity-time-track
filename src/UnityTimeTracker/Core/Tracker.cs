@@ -4,7 +4,7 @@ namespace UnityTimeTracker.Core;
 
 public enum TrackerState { NoUnity, Open, Active, Ide, Paused }
 
-public sealed record TrackerStatus(TrackerState State, string? Project, string? Scene)
+public sealed record TrackerStatus(TrackerState State, string? Project, string? Scene, long? ProjectId = null)
 {
     public string Describe() => State switch
     {
@@ -142,9 +142,9 @@ public sealed class Tracker : IDisposable
 
         if (now - lastFlush >= FlushEvery) FlushCore(now);
 
-        Publish(focused != null ? new TrackerStatus(TrackerState.Active, focused.Project.Title, focused.Scene)
-            : ideProject != null ? new TrackerStatus(TrackerState.Ide, ideProject.Title, null)
-            : first != null ? new TrackerStatus(TrackerState.Open, first.Project.Title, first.Scene)
+        Publish(focused != null ? new TrackerStatus(TrackerState.Active, focused.Project.Title, focused.Scene, focused.Project.Id)
+            : ideProject != null ? new TrackerStatus(TrackerState.Ide, ideProject.Title, null, ideProject.Id)
+            : first != null ? new TrackerStatus(TrackerState.Open, first.Project.Title, first.Scene, first.Project.Id)
             : new TrackerStatus(TrackerState.NoUnity, null, null));
     }
 
@@ -245,6 +245,17 @@ public sealed class Tracker : IDisposable
     public void ReloadProjects()
     {
         lock (gate) projectsLoaded = default;
+    }
+
+    // Live work spans of a project restart on the next tick, e.g. after their rows were deleted.
+    public void RestartWork(long projectId)
+    {
+        lock (gate)
+        {
+            foreach (var ed in editors.Values.Where(e => e.Project.Id == projectId)) ed.Active = null;
+            if (ide?.ProjectId == projectId) ide = null;
+            closed.RemoveAll(s => s.ProjectId == projectId && s.Kind != SpanKind.Open);
+        }
     }
 
     Project? MatchIde(string title, DateTime now)

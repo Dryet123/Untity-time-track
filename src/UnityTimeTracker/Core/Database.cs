@@ -47,6 +47,21 @@ public sealed class Database
             CREATE INDEX IF NOT EXISTS ix_spans_project ON spans(project_id);
             CREATE INDEX IF NOT EXISTS ix_spans_end ON spans(end_ms);
             """);
+        Migrate(c);
+    }
+
+    static void Migrate(SqliteConnection c)
+    {
+        using var get = Cmd(c, "PRAGMA user_version");
+        var version = (long)get.ExecuteScalar()!;
+        if (version < 1)
+        {
+            Exec(c, """
+                ALTER TABLE spans ADD COLUMN manual INTEGER NOT NULL DEFAULT 0;
+                CREATE TABLE IF NOT EXISTS notes(day TEXT PRIMARY KEY, text TEXT NOT NULL);
+                PRAGMA user_version = 1;
+                """);
+        }
     }
 
     SqliteConnection Open()
@@ -235,7 +250,7 @@ public sealed class Database
     public List<SpanRec> LoadSpans()
     {
         using var c = Open();
-        using var cmd = Cmd(c, "SELECT id, project_id, session_id, kind, scene, start_ms, end_ms FROM spans WHERE end_ms > start_ms ORDER BY start_ms");
+        using var cmd = Cmd(c, "SELECT id, project_id, session_id, kind, scene, start_ms, end_ms, manual FROM spans WHERE end_ms > start_ms ORDER BY start_ms");
         using var r = cmd.ExecuteReader();
         var list = new List<SpanRec>();
         while (r.Read())
@@ -244,9 +259,92 @@ public sealed class Database
             var start = Local(a);
             // Duration comes from UTC so DST switches never produce negative spans.
             list.Add(new SpanRec(r.GetInt64(0), r.GetInt64(1), r.GetInt64(2), (SpanKind)r.GetInt32(3), Str(r, 4),
-                start, start + TimeSpan.FromMilliseconds(b - a)));
+                start, start + TimeSpan.FromMilliseconds(b - a), r.GetInt64(7) != 0));
         }
         return list;
+    }
+
+    static long LocalMs(DateTime local) => new DateTimeOffset(local).ToUnixTimeMilliseconds();
+
+    public void AddManual(long projectId, SpanKind kind, DateTime startLocal, DateTime endLocal)
+    {
+        using var c = Open();
+        using var tx = c.BeginTransaction();
+        var kinds = kind == SpanKind.Editor ? new[] { SpanKind.Open, SpanKind.Editor } : [kind];
+        foreach (var k in kinds)
+        {
+            using var cmd = Cmd(c, "INSERT INTO spans(project_id, session_id, kind, scene, start_ms, end_ms, manual) VALUES($p, 0, $k, NULL, $a, $b, 1)",
+                ("$p", projectId), ("$k", (int)k), ("$a", LocalMs(startLocal)), ("$b", LocalMs(endLocal)));
+            cmd.Transaction = tx;
+            cmd.ExecuteNonQuery();
+        }
+        tx.Commit();
+    }
+
+    // Removes the work (and manually added open time) of one project inside a time range.
+    public int DeleteWork(long projectId, DateTime fromLocal, DateTime toLocal)
+    {
+        using var c = Open();
+        using var cmd = Cmd(c, """
+            DELETE FROM spans WHERE project_id = $p AND start_ms >= $a AND end_ms <= $b AND (kind <> 0 OR manual = 1)
+            """, ("$p", projectId), ("$a", LocalMs(fromLocal)), ("$b", LocalMs(toLocal)));
+        return cmd.ExecuteNonQuery();
+    }
+
+    public void MergeProject(long from, long into)
+    {
+        using var c = Open();
+        using var tx = c.BeginTransaction();
+        foreach (var sql in new[]
+                 {
+                     "UPDATE spans SET project_id = $to WHERE project_id = $from",
+                     "UPDATE sessions SET project_id = $to WHERE project_id = $from",
+                     "DELETE FROM projects WHERE id = $from",
+                 })
+        {
+            using var cmd = Cmd(c, sql, ("$from", from), ("$to", into));
+            cmd.Transaction = tx;
+            cmd.ExecuteNonQuery();
+        }
+        tx.Commit();
+    }
+
+    public Dictionary<DateOnly, string> LoadNotes()
+    {
+        using var c = Open();
+        using var cmd = Cmd(c, "SELECT day, text FROM notes");
+        using var r = cmd.ExecuteReader();
+        var map = new Dictionary<DateOnly, string>();
+        while (r.Read())
+            if (DateOnly.TryParseExact(r.GetString(0), "yyyy-MM-dd", out var d)) map[d] = r.GetString(1);
+        return map;
+    }
+
+    public void SaveNote(DateOnly day, string text)
+    {
+        using var c = Open();
+        var key = day.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        if (string.IsNullOrWhiteSpace(text)) Exec(c, "DELETE FROM notes WHERE day = $d", ("$d", key));
+        else Exec(c, "INSERT INTO notes(day, text) VALUES($d, $t) ON CONFLICT(day) DO UPDATE SET text = excluded.text", ("$d", key), ("$t", text.TrimEnd()));
+    }
+
+    public Dictionary<long, TimeSpan> WorkByProject(DateTime fromUtc, DateTime toUtc)
+    {
+        using var c = Open();
+        using var cmd = Cmd(c, """
+            SELECT project_id, SUM(MIN(end_ms, $b) - MAX(start_ms, $a)) FROM spans
+            WHERE kind <> 0 AND end_ms > $a AND start_ms < $b GROUP BY project_id
+            """, ("$a", Ms(fromUtc)), ("$b", Ms(toUtc)));
+        using var r = cmd.ExecuteReader();
+        var map = new Dictionary<long, TimeSpan>();
+        while (r.Read()) map[r.GetInt64(0)] = TimeSpan.FromMilliseconds(r.GetInt64(1));
+        return map;
+    }
+
+    public void BackupTo(string file)
+    {
+        using var c = Open();
+        Exec(c, "VACUUM INTO $f", ("$f", file));
     }
 
     public List<SessionRec> LoadSessions()

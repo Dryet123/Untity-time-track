@@ -70,6 +70,8 @@
                 <Button x:Name="OpenUnityButton" Content="Open in Unity" Margin="0,0,6,6" Click="OnOpenUnity"/>
                 <Button x:Name="HideButton" Content="Hide" Margin="0,0,6,6" Click="OnHide"
                         ToolTip="Hidden projects are left out of Overview, Calendar and Log"/>
+                <Button Content="Report..." Margin="0,0,6,6" Click="OnReport" ToolTip="Printable HTML report for the selected period"/>
+                <Button Content="Merge into..." Margin="0,0,6,6" Click="OnMerge" ToolTip="Move this project's time into another project"/>
                 <Button Content="Delete data..." Margin="0,0,6,6" Click="OnDelete"/>
               </WrapPanel>
               <StackPanel Orientation="Horizontal" Margin="4,4,0,0">

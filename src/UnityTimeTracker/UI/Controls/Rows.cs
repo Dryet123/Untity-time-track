@@ -35,7 +35,8 @@ public sealed class SessionRow
     public string EditorText => Fmt.Dur(Session.Editor);
     public string IdeText => Session.Ide > TimeSpan.Zero ? Fmt.Dur(Session.Ide) : "";
     public string Scenes => string.Join(", ", Session.Scenes.OrderByDescending(kv => kv.Value).Select(kv => kv.Key));
-    public string ScenesSuffix => Session.Scenes.Count > 0 ? "   " + Scenes : "";
+    public string ScenesWithSource => Session.Manual ? (Scenes.Length > 0 ? Scenes + ", added manually" : "added manually") : Scenes;
+    public string ScenesSuffix => ScenesWithSource.Length > 0 ? "   " + ScenesWithSource : "";
 
     public static SessionRow From(WorkSession s, DataSnapshot snap) => new() { Session = s, Project = snap.Get(s.ProjectId) };
 }

@@ -5,15 +5,31 @@
   <DockPanel Margin="8">
     <Border DockPanel.Dock="Top" Background="#383838" Padding="10,7" Margin="0,0,0,8">
       <DockPanel>
-        <Button DockPanel.Dock="Right" Content="Export CSV..." Click="OnExport"/>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+          <Button Content="Report..." Margin="6,0,0,0" Click="OnReport" ToolTip="Printable HTML report for this period"/>
+          <Button Content="Export CSV..." Margin="6,0,0,0" Click="OnExport"/>
+        </StackPanel>
         <c:PeriodPicker x:Name="Picker" PeriodChanged="OnPeriodChanged"/>
+      </DockPanel>
+    </Border>
+    <Border DockPanel.Dock="Top" Background="#383838" Padding="10,7" Margin="0,0,0,8">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+          <Button Content="Add time..." Margin="6,0,0,0" Click="OnAddTime" ToolTip="Add time the tracker missed"/>
+          <Button x:Name="DeleteButton" Content="Delete session" Margin="6,0,0,0" Click="OnDelete" IsEnabled="False"/>
+        </StackPanel>
+        <Grid Width="240" HorizontalAlignment="Left">
+          <TextBox x:Name="FilterBox" TextChanged="OnFilterChanged" Padding="4,3"/>
+          <TextBlock x:Name="FilterHint" Text="Filter by project or scene" Foreground="#777777" Margin="8,0,0,0"
+                     VerticalAlignment="Center" IsHitTestVisible="False"/>
+        </Grid>
       </DockPanel>
     </Border>
     <Border DockPanel.Dock="Bottom" Background="#383838" BorderBrush="#2A2A2A" BorderThickness="0,1,0,0" Padding="10,6">
       <TextBlock x:Name="Footer" Foreground="#9A9A9A"/>
     </Border>
     <Grid>
-      <DataGrid x:Name="Table">
+      <DataGrid x:Name="Table" SelectionChanged="OnSelectionChanged" PreviewKeyDown="OnTableKey">
         <DataGrid.Columns>
           <DataGridTextColumn Header="Date" Binding="{Binding Date}" SortMemberPath="Start" Width="130"/>
           <DataGridTemplateColumn Header="Project" SortMemberPath="Name" Width="200">
@@ -31,7 +47,7 @@
           <DataGridTextColumn Header="Total" Binding="{Binding WorkText}" SortMemberPath="Work" Width="80"/>
           <DataGridTextColumn Header="In Unity" Binding="{Binding EditorText}" SortMemberPath="Editor" Width="80"/>
           <DataGridTextColumn Header="In IDE" Binding="{Binding IdeText}" SortMemberPath="Ide" Width="80"/>
-          <DataGridTextColumn Header="Scenes" Binding="{Binding Scenes}" Width="*">
+          <DataGridTextColumn Header="Scenes" Binding="{Binding ScenesWithSource}" Width="*">
             <DataGridTextColumn.ElementStyle>
               <Style TargetType="TextBlock">
                 <Setter Property="Foreground" Value="#9A9A9A"/>

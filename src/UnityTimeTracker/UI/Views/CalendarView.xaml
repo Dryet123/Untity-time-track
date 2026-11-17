@@ -50,11 +50,19 @@
 
         <HeaderedContentControl Grid.Column="2" Style="{StaticResource Section}" VerticalAlignment="Top">
           <HeaderedContentControl.Header>
-            <TextBlock x:Name="DayHeader"/>
+            <DockPanel>
+              <Button DockPanel.Dock="Right" Content="Add time..." FontWeight="Normal" Click="OnAddTime"/>
+              <TextBlock x:Name="DayHeader" VerticalAlignment="Center"/>
+            </DockPanel>
           </HeaderedContentControl.Header>
           <StackPanel>
             <c:StatStrip x:Name="DayStats" Columns="4"/>
             <c:DayTimeline x:Name="Timeline" Margin="0,4,0,14"/>
+            <TextBlock Text="Note" FontWeight="Bold" Margin="0,0,0,4"/>
+            <TextBox x:Name="NoteBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="54" MaxHeight="160"
+                     VerticalScrollBarVisibility="Auto" Margin="0,0,0,14" Padding="4,3"
+                     ToolTip="What you did this day. Saved automatically, included in reports."
+                     TextChanged="OnNoteChanged" LostKeyboardFocus="OnNoteLostFocus"/>
             <TextBlock x:Name="DayProjectsLabel" Text="Projects" FontWeight="Bold" Margin="0,0,0,4"/>
             <ItemsControl x:Name="DayProjects" ItemTemplate="{StaticResource ShareRow}" Margin="0,0,0,14"/>
             <TextBlock Text="Sessions" FontWeight="Bold" Margin="0,0,0,4"/>
