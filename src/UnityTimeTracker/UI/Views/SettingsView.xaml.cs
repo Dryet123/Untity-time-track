@@ -90,6 +90,17 @@ public partial class SettingsView : UserControl, IView
         loading = false;
         ShowAutostartInfo();
         ShowBackupInfo();
+
+        bool installed = Installer.IsInstalledCopy;
+        AppInfo.Text = installed
+            ? $"Version {Installer.Short(Installer.CurrentVersion)}, installed in {Installer.InstallDir}"
+            : $"Version {Installer.Short(Installer.CurrentVersion)}, running without install from {Path.GetDirectoryName(Environment.ProcessPath)}";
+        UninstallButton.IsEnabled = installed;
+    }
+
+    void OnUninstall(object sender, RoutedEventArgs e)
+    {
+        if (Setup.Uninstall(Window.GetWindow(this), fromRunningApp: true)) ((App)Application.Current).ExitApp();
     }
 
     void ShowAutostartInfo()

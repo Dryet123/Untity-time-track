@@ -46,6 +46,14 @@ public static class Autostart
         approved.SetValue(ValueName, data, RegistryValueKind.Binary);
     }
 
+    public static void Remove()
+    {
+        using (var run = Registry.CurrentUser.OpenSubKey(RunKey, writable: true))
+            run?.DeleteValue(ValueName, throwOnMissingValue: false);
+        using var approved = Registry.CurrentUser.OpenSubKey(ApprovedKey, writable: true);
+        approved?.DeleteValue(ValueName, throwOnMissingValue: false);
+    }
+
     // Keeps the entry pointing at this exe if the app was moved; leaves the on/off state alone.
     public static void SyncPath()
     {

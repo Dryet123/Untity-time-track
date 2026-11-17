@@ -8,12 +8,6 @@ namespace UnityTimeTracker;
 
 public partial class App : Application
 {
-    // One instance per data folder, so a test copy with UTT_DATA_DIR can run next to the real one.
-    static readonly string Scope = $@"Local\UnityTimeTracker.{StableHash(AppPaths.DataDir.ToLowerInvariant()):x8}";
-    static readonly string InstanceName = Scope + ".Instance";
-    static readonly string ShowSignalName = Scope + ".Show";
-    static readonly string ExitSignalName = Scope + ".Exit";
-
     public static Database Db { get; private set; } = null!;
     public static AppSettings Settings { get; private set; } = null!;
     public static Tracker Tracker { get; private set; } = null!;
@@ -28,17 +22,6 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-
-        // "--exit" asks a running copy to quit cleanly (used by publish.ps1).
-        bool exitRequest = e.Args.Contains("--exit", StringComparer.OrdinalIgnoreCase);
-        instance = new Mutex(true, InstanceName, out bool first);
-        if (!first || exitRequest)
-        {
-            Signal(exitRequest ? ExitSignalName : ShowSignalName);
-            Shutdown();
-            return;
-        }
-
         var culture = CultureInfo.GetCultureInfo("en-GB");
         CultureInfo.DefaultThreadCurrentCulture = culture;
         CultureInfo.DefaultThreadCurrentUICulture = culture;
@@ -49,6 +32,36 @@ public partial class App : Application
             Log.Error(a.Exception);
             a.Handled = true;
         };
+
+        bool Has(string arg) => e.Args.Contains(arg, StringComparer.OrdinalIgnoreCase);
+
+        // "--uninstall" comes from Settings > Apps.
+        if (Has("--uninstall"))
+        {
+            Setup.Uninstall(null, fromRunningApp: false);
+            Shutdown();
+            return;
+        }
+
+#if !DEBUG
+        // A downloaded exe offers to install itself; test copies and "--portable" skip that.
+        if (!Installer.IsInstalledCopy && !AppPaths.IsCustom && !Has("--portable") && !Has("--exit")
+            && Setup.OfferInstall() == Setup.Outcome.Exit)
+        {
+            Shutdown();
+            return;
+        }
+#endif
+
+        // "--exit" asks a running copy to quit cleanly (used by publish.ps1 and the installer).
+        bool exitRequest = Has("--exit");
+        instance = new Mutex(true, AppPaths.SyncName("Instance"), out bool first);
+        if (!first || exitRequest)
+        {
+            AppPaths.Signal(exitRequest ? "Exit" : "Show");
+            Shutdown();
+            return;
+        }
 
         Settings = AppSettings.Load();
         Clock.Offset = Settings.DayStartHour;
@@ -76,42 +89,27 @@ public partial class App : Application
         UpdateTray();
         Backup.RunIfDue(Db, Settings);
 
-        showSignal = Listen(ShowSignalName, ShowMain);
-        exitSignal = Listen(ExitSignalName, ExitApp);
+        showSignal = Listen("Show", ShowMain);
+        exitSignal = Listen("Exit", ExitApp);
 
-        if (!e.Args.Contains("--tray", StringComparer.OrdinalIgnoreCase)) ShowMain();
+        if (!Has("--tray")) ShowMain();
     }
 
-    // string.GetHashCode is randomized per process, so names shared between processes need their own hash.
-    static uint StableHash(string s)
+    EventWaitHandle Listen(string kind, Action action)
     {
-        uint h = 2166136261;
-        foreach (char c in s) h = (h ^ c) * 16777619;
-        return h;
-    }
-
-    static void Signal(string name)
-    {
-        try
-        {
-            using var ev = EventWaitHandle.OpenExisting(name);
-            ev.Set();
-        }
-        catch (WaitHandleCannotBeOpenedException) { }
-    }
-
-    EventWaitHandle Listen(string name, Action action)
-    {
-        var ev = new EventWaitHandle(false, EventResetMode.AutoReset, name);
+        var ev = new EventWaitHandle(false, EventResetMode.AutoReset, AppPaths.SyncName(kind));
         ThreadPool.RegisterWaitForSingleObject(ev, (_, _) => Dispatcher.BeginInvoke(action), null, Timeout.Infinite, false);
         return ev;
     }
 
+    // Only the installed copy registers itself; a portable run never touches autostart.
     static void SetupAutostart()
     {
 #if !DEBUG
+        if (!Installer.IsInstalledCopy || AppPaths.IsCustom) return;
         try
         {
+            Installer.EnsureRegistered();
             if (!Settings.AutostartRegistered)
             {
                 Autostart.SetEnabled(true);

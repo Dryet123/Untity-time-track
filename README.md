@@ -42,10 +42,14 @@ The app registers itself in the registry `Run` key, so it appears in Task Manage
 
 ## Install
 
+Download `UnityTimeTracker.exe` from the [latest release](https://github.com/Dryet123/Untity-time-track/releases/latest) and run it. It carries its own .NET runtime, so nothing else needs to be installed. On first launch it offers to install itself for your Windows user without admin rights: it goes to `%LOCALAPPDATA%\Programs\UnityTimeTracker`, gets a Start menu shortcut, starts with Windows and appears in Settings > Apps, where it can be uninstalled. Running a newer exe offers to update the installed copy and keeps your data. Windows SmartScreen may warn because the file isn't signed; choose More info, then Run anyway.
+
+## Build from source
+
 ```powershell
 .\publish.ps1
 ```
 
-This builds a Release copy into `%LOCALAPPDATA%\Programs\UnityTimeTracker`, closes the running copy and starts the new one. The Release build registers autostart on its first run.
+This needs the .NET 10 SDK. It builds a Release copy into `%LOCALAPPDATA%\Programs\UnityTimeTracker`, closes the running copy and starts the new one. Pushing a tag such as `v1.0.0` makes GitHub Actions build the self-contained exe and publish a release.
 
 Data lives in `%LOCALAPPDATA%\UnityTimeTracker` (`tracker.db`, `settings.json`, `icons\`, `backups\`). Set the `UTT_DATA_DIR` environment variable to point a test copy at another folder; a copy with its own data folder runs as a separate instance.

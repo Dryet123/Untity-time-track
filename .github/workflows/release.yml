@@ -1,0 +1,37 @@
+name: Release
+
+# Pushing a tag like v1.2.0 builds a self-contained exe and publishes it as a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart("v")
+          dotnet publish src/UnityTimeTracker -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:Version=$version -o out
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item out/UnityTimeTracker.exe dist/UnityTimeTracker.exe
+
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/UnityTimeTracker.exe `
+            --title "Unity Time Tracker ${{ github.ref_name }}" --notes-file .github/release-notes.md
